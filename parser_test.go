@@ -109,9 +109,9 @@ Host *
 				{Indent: "    ", Key: "User", Sep: " ", Value: "myuser"},
 				{Indent: "    ", Comment: "# Port comment"},
 				{Indent: "    ", Key: "Port", Sep: " ", Value: "22"},
-				{Indent: ""}, // Empty line
 			},
 		},
+		{Indent: ""}, // Empty line
 		{
 			Indent: "",
 			Key:    "Host",
@@ -126,5 +126,48 @@ Host *
 
 	if !reflect.DeepEqual(organized, expected) {
 		t.Errorf("OrganizeConfig result does not match expected structure.\nGot: %+v\nWant: %+v", organized, expected)
+	}
+}
+
+func TestOrganizeConfigEmptyLines(t *testing.T) {
+	input := `Host example
+    HostName example.com
+    User myuser
+
+Host other
+    Port 22
+
+`
+	// Parse the input into Lines
+	lines := parseLines(input)
+	organized := OrganizeConfig(lines)
+
+	// Expected structure with empty lines at top level
+	expected := []Line{
+		{
+			Indent: "",
+			Key:    "Host",
+			Sep:    " ",
+			Value:  "example",
+			Children: []Line{
+				{Indent: "    ", Key: "HostName", Sep: " ", Value: "example.com"},
+				{Indent: "    ", Key: "User", Sep: " ", Value: "myuser"},
+			},
+		},
+		{}, // Empty line moved to top level
+		{
+			Indent: "",
+			Key:    "Host",
+			Sep:    " ",
+			Value:  "other",
+			Children: []Line{
+				{Indent: "    ", Key: "Port", Sep: " ", Value: "22"},
+			},
+		},
+		{}, // Empty line moved to top level
+	}
+
+	if !reflect.DeepEqual(organized, expected) {
+		t.Errorf("OrganizeConfig empty lines handling failed.\nGot: %+v\nWant: %+v", organized, expected)
 	}
 }

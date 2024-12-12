@@ -89,5 +89,43 @@ func OrganizeConfig(lines []Line) []Line {
 		}
 	}
 
+	// Clean up empty lines
+	return cleanEmptyLines(result)
+}
+
+// cleanEmptyLines processes a slice of Lines and moves trailing empty lines
+// from children to the parent level
+func cleanEmptyLines(lines []Line) []Line {
+	var result []Line
+
+	for _, line := range lines {
+		// Create a copy of the line to modify
+		newLine := line
+		var trailingEmptyLines []Line
+
+		if len(line.Children) > 0 {
+			// Collect trailing empty lines from end of children
+			for i := len(newLine.Children) - 1; i >= 0; i-- {
+				child := newLine.Children[i]
+				if child.Key == "" && child.Indent == "" {
+					trailingEmptyLines = append(trailingEmptyLines, child)
+					newLine.Children = newLine.Children[:i]
+				} else {
+					break
+				}
+			}
+
+			// Add the host/match line
+			result = append(result, newLine)
+
+			// Add collected empty lines in original order
+			for i := len(trailingEmptyLines) - 1; i >= 0; i-- {
+				result = append(result, trailingEmptyLines[i])
+			}
+		} else {
+			result = append(result, line)
+		}
+	}
+
 	return result
 }
