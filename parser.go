@@ -1,108 +1,92 @@
-package provider
+package sshconf
 
 import (
-	"io"
+	"bufio"
+	"regexp"
 	"strings"
-
-	"github.com/alecthomas/participle/v2"
-	"github.com/alecthomas/participle/v2/lexer"
 )
 
-// Config represents a complete SSH config file
-type Config struct {
-	Lines []*Line `@@*`
-}
-
-// Line represents either a comment, directive, or empty line
 type Line struct {
-	LeadingSpace *string    `(@Whitespace)?`
-	Comment      *string    `( @Comment @Newline`
-	TrailingNL   *string    `)?`
-	Directive    *Directive `| @@`
-	Empty        *string    `| @EmptyLine`
+	Indent      string // The indentation of the line
+	Key         string // The directive/keyword (e.g., "Host", "HostName", etc.)
+	Sep         string // The separator between the key and the value (e.g., " ", "=")
+	Value       string // The values associated with the directive
+	TrailIndent string // The indentation of the trailing comment
+	Comment     string // Any comment on the line, for lines with only a comment everything except indent and comment is empty
+	Children    []Line // The children of the line (for Host and Match directives)
 }
 
-// Directive represents a configuration directive and its children
-type Directive struct {
-	Key           string       `@Ident`
-	Space         *string      `(@Whitespace)?`
-	Value         *string      `(@Value)?`
-	TrailingSpace *string      `(@Whitespace)?`
-	Comment       *string      `(@Comment)?`
-	TrailingNL    string       `@Newline`
-	Children      []*Directive `( @@ )*`
+// ParseLine parses a single line of an SSH config file into a Line struct
+func ParseLine(line string) Line {
+	// Regex pattern to match SSH config line components
+	parts := []string{
+		`^(\s*)?`,                              // Group 1: Leading indentation (optional whitespace at start of line)
+		`([^\s=#]+)?`,                          // Group 2: Key/directive (captures text until it hits whitespace, =, or #)
+		`(\s*=?\s*)?`,                          // Group 3: Separator (whitespace before/after an optional = character)
+		`((?:[^"#\s][^\s#]*|"[^"]*"|\s+?)*?)?`, // Group 4: Value (quoted or unquoted strings)
+		`(\s*)?`,                               // Group 5: Trailing whitespace before any comment
+		`(#.*)?$`,                              // Group 6: Comment (# followed by any text until end of line)
+	}
+	pattern := strings.Join(parts, "")
+	re := regexp.MustCompile(pattern)
+	matches := re.FindStringSubmatch(line)
+
+	if matches == nil {
+		// Return empty Line if no match (shouldn't happen with this pattern)
+		return Line{}
+	}
+
+	return Line{
+		Indent:      matches[1],
+		Key:         matches[2],
+		Sep:         matches[3],
+		Value:       matches[4],
+		TrailIndent: matches[5],
+		Comment:     matches[6],
+	}
 }
 
-var (
-	sshLexer = lexer.MustSimple([]lexer.SimpleRule{
-		{"Comment", `#[^\n]*`},
-		{"EmptyLine", `\n\s*\n`},
-		{"Whitespace", `[\t ]+`},
-		{"Newline", `\n`},
-		{"Ident", `[A-Za-z][A-Za-z0-9_-]*`},
-		{"Value", `[^\s#\n][^\n#]*`},
-	})
+// parseLines parses an entire SSH config file content into a slice of Lines
+func parseLines(content string) []Line {
+	var lines []Line
+	scanner := bufio.NewScanner(strings.NewReader(content))
 
-	parser = participle.MustBuild[Config](
-		participle.Lexer(sshLexer),
-		participle.UseLookahead(2),
-	)
-)
+	for scanner.Scan() {
+		lines = append(lines, ParseLine(scanner.Text()))
+	}
 
-// ParseConfig parses an SSH config from a reader
-func ParseConfig(r io.Reader) (*Config, error) {
-	return parser.Parse("", r)
+	return lines
 }
 
-// String converts the Config back to its string representation
-func (c *Config) String() string {
-	var result string
-	for i, line := range c.Lines {
-		if i > 0 && line.LeadingSpace == nil {
-			result += "\n"
-		}
+// OrganizeConfig takes a flat slice of Lines and returns a hierarchical structure
+// where Host and Match blocks have their parameters as children
+func OrganizeConfig(lines []Line) []Line {
+	var result []Line
+	var currentParent *Line
 
-		if line.LeadingSpace != nil {
-			result += *line.LeadingSpace
-		}
-
-		if line.Comment != nil {
-			result += *line.Comment
-			if line.TrailingNL != nil {
-				result += *line.TrailingNL
+	for _, line := range lines {
+		// If line has no key (empty line or comment), add it to current parent or result
+		if line.Key == "" {
+			if currentParent != nil {
+				currentParent.Children = append(currentParent.Children, line)
+			} else {
+				result = append(result, line)
 			}
-		} else if line.Empty != nil {
-			result += *line.Empty
-		} else if line.Directive != nil {
-			result += formatDirective(line.Directive, 0)
+			continue
 		}
-	}
-	return result
-}
 
-// formatDirective formats a directive with proper indentation
-func formatDirective(d *Directive, indent int) string {
-	indentStr := strings.Repeat("    ", indent)
-	result := indentStr + d.Key
-
-	if d.Space != nil {
-		result += *d.Space
-	}
-	if d.Value != nil {
-		result += *d.Value
-	}
-	if d.TrailingSpace != nil {
-		result += *d.TrailingSpace
-	}
-	if d.Comment != nil {
-		result += *d.Comment
-	}
-	if d.TrailingNL != "" {
-		result += d.TrailingNL
-	}
-
-	for _, child := range d.Children {
-		result += formatDirective(child, indent+1)
+		// Check if this is a Host or Match directive
+		if strings.EqualFold(line.Key, "Host") || strings.EqualFold(line.Key, "Match") {
+			result = append(result, line)
+			currentParent = &result[len(result)-1]
+		} else {
+			// This is a parameter line
+			if currentParent != nil {
+				currentParent.Children = append(currentParent.Children, line)
+			} else {
+				result = append(result, line)
+			}
+		}
 	}
 
 	return result
