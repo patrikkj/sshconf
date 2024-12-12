@@ -1,0 +1,126 @@
+package provider
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestParseConfig(t *testing.T) {
+	input := `# Global settings
+Host *
+    ForwardAgent no
+    ServerAliveInterval 60
+
+# Development servers
+Host dev-*  # Development pattern
+    User developer
+    ForwardAgent yes
+
+# Empty line follows
+
+Match host example.com user admin
+    IdentityFile ~/.ssh/admin_key
+    Port 2222 # Custom port`
+
+	t.Logf("Testing input:\n%s", input)
+	config, err := ParseConfig(strings.NewReader(input))
+	if err != nil {
+		t.Fatalf("ParseConfig() error = %v", err)
+	}
+
+	// Test roundtrip
+	output := config.String()
+	if output != input {
+		t.Errorf("Roundtrip failed.\nExpected:\n%s\nGot:\n%s", input, output)
+	}
+
+	// Verify structure
+	if len(config.Lines) != 8 { // Comments, directives, and empty lines
+		t.Errorf("Expected 8 entries, got %d", len(config.Lines))
+	}
+
+	// Check Host * section
+	var hostAll *Directive
+	for _, entry := range config.Lines {
+		if entry.Directive != nil && entry.Directive.Key == "Host" && entry.Directive.Value != nil && *entry.Directive.Value == "*" {
+			hostAll = entry.Directive
+			break
+		}
+	}
+	if hostAll == nil {
+		t.Fatal("Host * section not found")
+	}
+	if len(hostAll.Children) != 2 {
+		t.Errorf("Expected 2 children in Host * section, got %d", len(hostAll.Children))
+	}
+
+	// Check Match section
+	var matchSection *Directive
+	for _, entry := range config.Lines {
+		if entry.Directive != nil && entry.Directive.Key == "Match" {
+			matchSection = entry.Directive
+			break
+		}
+	}
+	if matchSection == nil {
+		t.Fatal("Match section not found")
+	}
+	expectedValue := "host example.com user admin"
+	if matchSection.Value == nil || *matchSection.Value != expectedValue {
+		t.Errorf("Expected Match value %q, got %q", expectedValue, getValue(matchSection.Value))
+	}
+	if len(matchSection.Children) != 2 {
+		t.Errorf("Expected 2 children in Match section, got %d", len(matchSection.Children))
+	}
+}
+
+// getValue safely gets the string value from a pointer
+func getValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func TestParseEdgeCases(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "empty file",
+			input: "",
+		},
+		{
+			name:  "only comments",
+			input: "# Comment 1\n# Comment 2",
+		},
+		{
+			name:  "directive without value",
+			input: "ForwardAgent",
+		},
+		{
+			name:  "multiple empty lines",
+			input: "\n\n\nHost example.com\n\n",
+		},
+		{
+			name:  "mixed indentation",
+			input: "Host example.com\n  User admin\n\tPort 2222",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Testing case %q with input:\n%s", tt.name, tt.input)
+			config, err := ParseConfig(strings.NewReader(tt.input))
+			if err != nil {
+				t.Fatalf("ParseConfig() error = %v", err)
+			}
+
+			output := config.String()
+			if output != tt.input {
+				t.Errorf("Roundtrip failed.\nExpected:\n%s\nGot:\n%s", tt.input, output)
+			}
+		})
+	}
+}
