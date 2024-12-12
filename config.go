@@ -116,3 +116,8 @@ func (c *SSHConfig) Patch(find, replacement string) error {
 func (c *SSHConfig) Delete(find string) error {
 	return c.Patch(find, "")
 }
+
+// Lines returns the parsed lines in the config
+func (c *SSHConfig) Lines() []Line {
+	return c.lines
+}
