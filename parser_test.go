@@ -12,29 +12,63 @@ func TestParseLine(t *testing.T) {
 		expected Line
 	}{
 		{
-			name:     "Simple key-value",
-			input:    "Host example.com",
-			expected: Line{Indent: "", Key: "Host", Sep: " ", Value: "example.com"},
+			name:  "Simple key-value",
+			input: "Host example.com",
+			expected: Line{
+				LineNoChildren: LineNoChildren{
+					Indent: "",
+					Key:    "Host",
+					Sep:    " ",
+					Value:  "example.com",
+				},
+			},
 		},
 		{
-			name:     "Simple key-value with multiple values",
-			input:    "Host example.com example.com.staging",
-			expected: Line{Indent: "", Key: "Host", Sep: " ", Value: "example.com example.com.staging"},
+			name:  "Simple key-value with multiple values",
+			input: "Host example.com example.com.staging",
+			expected: Line{
+				LineNoChildren: LineNoChildren{
+					Indent: "",
+					Key:    "Host",
+					Sep:    " ",
+					Value:  "example.com example.com.staging",
+				},
+			},
 		},
 		{
-			name:     "With comment",
-			input:    "Host example.com example.com.staging  # My server",
-			expected: Line{Indent: "", Key: "Host", Sep: " ", Value: "example.com example.com.staging", TrailIndent: "  ", Comment: "# My server"},
+			name:  "With comment",
+			input: "Host example.com example.com.staging  # My server",
+			expected: Line{
+				LineNoChildren: LineNoChildren{
+					Indent:      "",
+					Key:         "Host",
+					Sep:         " ",
+					Value:       "example.com example.com.staging",
+					TrailIndent: "  ",
+					Comment:     "# My server",
+				},
+			},
 		},
 		{
-			name:     "Indented with equals",
-			input:    "    IdentityFile = ~/.ssh/id_rsa",
-			expected: Line{Indent: "    ", Key: "IdentityFile", Sep: " = ", Value: "~/.ssh/id_rsa"},
+			name:  "Indented with equals",
+			input: "    IdentityFile = ~/.ssh/id_rsa",
+			expected: Line{
+				LineNoChildren: LineNoChildren{
+					Indent: "    ",
+					Key:    "IdentityFile",
+					Sep:    " = ",
+					Value:  "~/.ssh/id_rsa",
+				},
+			},
 		},
 		{
-			name:     "Comment only",
-			input:    "# Just a comment",
-			expected: Line{Comment: "# Just a comment"},
+			name:  "Comment only",
+			input: "# Just a comment",
+			expected: Line{
+				LineNoChildren: LineNoChildren{
+					Comment: "# Just a comment",
+				},
+			},
 		},
 		{
 			name:     "Empty line",
@@ -64,14 +98,65 @@ Host *.staging
     User staging-user`
 
 	expected := []Line{
-		{Indent: "", Comment: "# SSH Config"},
-		{Indent: "", Key: "Host", Sep: " ", Value: "example.com"},
-		{Indent: "    ", Key: "HostName", Sep: " ", Value: "example.com"},
-		{Indent: "    ", Key: "User", Sep: " ", Value: "myuser"},
-		{Indent: "    ", Key: "IdentityFile", Sep: " = ", Value: "~/.ssh/id_rsa", TrailIndent: "  ", Comment: "# My key"},
-		{Indent: ""}, // Empty line
-		{Indent: "", Key: "Host", Sep: " ", Value: "*.staging"},
-		{Indent: "    ", Key: "User", Sep: " ", Value: "staging-user"},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent:  "",
+				Comment: "# SSH Config",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "example.com",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "    ",
+				Key:    "HostName",
+				Sep:    " ",
+				Value:  "example.com",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "    ",
+				Key:    "User",
+				Sep:    " ",
+				Value:  "myuser",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent:      "    ",
+				Key:         "IdentityFile",
+				Sep:         " = ",
+				Value:       "~/.ssh/id_rsa",
+				TrailIndent: "  ",
+				Comment:     "# My key",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "*.staging",
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "    ",
+				Key:    "User",
+				Sep:    " ",
+				Value:  "staging-user",
+			},
+		},
 	}
 
 	got := parseLines(input)
@@ -92,34 +177,71 @@ Host *
     Port 22
     User default`
 
-	// Parse the input into Lines
 	lines := parseLines(input)
 	organized := OrganizeConfig(lines)
 
-	// Expected structure updated to match actual parser behavior
 	expected := []Line{
-		{Indent: "", Comment: "# Global settings"},
 		{
-			Indent: "",
-			Key:    "Host",
-			Sep:    " ",
-			Value:  "example",
-			Children: []Line{
-				{Indent: "    ", Key: "HostName", Sep: " ", Value: "example.com"},
-				{Indent: "    ", Key: "User", Sep: " ", Value: "myuser"},
-				{Indent: "    ", Comment: "# Port comment"},
-				{Indent: "    ", Key: "Port", Sep: " ", Value: "22"},
+			LineNoChildren: LineNoChildren{
+				Indent:  "",
+				Comment: "# Global settings",
 			},
 		},
-		{Indent: ""}, // Empty line
 		{
-			Indent: "",
-			Key:    "Host",
-			Sep:    " ",
-			Value:  "*",
-			Children: []Line{
-				{Indent: "    ", Key: "Port", Sep: " ", Value: "22"},
-				{Indent: "    ", Key: "User", Sep: " ", Value: "default"},
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "example",
+			},
+			Children: []LineNoChildren{
+				{
+					Indent: "    ",
+					Key:    "HostName",
+					Sep:    " ",
+					Value:  "example.com",
+				},
+				{
+					Indent: "    ",
+					Key:    "User",
+					Sep:    " ",
+					Value:  "myuser",
+				},
+				{
+					Indent:  "    ",
+					Comment: "# Port comment",
+				},
+				{
+					Indent: "    ",
+					Key:    "Port",
+					Sep:    " ",
+					Value:  "22",
+				},
+			},
+		},
+		{
+			LineNoChildren: LineNoChildren{},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "*",
+			},
+			Children: []LineNoChildren{
+				{
+					Indent: "    ",
+					Key:    "Port",
+					Sep:    " ",
+					Value:  "22",
+				},
+				{
+					Indent: "    ",
+					Key:    "User",
+					Sep:    " ",
+					Value:  "default",
+				},
 			},
 		},
 	}
@@ -138,33 +260,54 @@ Host other
     Port 22
 
 `
-	// Parse the input into Lines
 	lines := parseLines(input)
 	organized := OrganizeConfig(lines)
 
-	// Expected structure with empty lines at top level
 	expected := []Line{
 		{
-			Indent: "",
-			Key:    "Host",
-			Sep:    " ",
-			Value:  "example",
-			Children: []Line{
-				{Indent: "    ", Key: "HostName", Sep: " ", Value: "example.com"},
-				{Indent: "    ", Key: "User", Sep: " ", Value: "myuser"},
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "example",
+			},
+			Children: []LineNoChildren{
+				{
+					Indent: "    ",
+					Key:    "HostName",
+					Sep:    " ",
+					Value:  "example.com",
+				},
+				{
+					Indent: "    ",
+					Key:    "User",
+					Sep:    " ",
+					Value:  "myuser",
+				},
 			},
 		},
-		{}, // Empty line moved to top level
 		{
-			Indent: "",
-			Key:    "Host",
-			Sep:    " ",
-			Value:  "other",
-			Children: []Line{
-				{Indent: "    ", Key: "Port", Sep: " ", Value: "22"},
+			LineNoChildren: LineNoChildren{},
+		},
+		{
+			LineNoChildren: LineNoChildren{
+				Indent: "",
+				Key:    "Host",
+				Sep:    " ",
+				Value:  "other",
+			},
+			Children: []LineNoChildren{
+				{
+					Indent: "    ",
+					Key:    "Port",
+					Sep:    " ",
+					Value:  "22",
+				},
 			},
 		},
-		{}, // Empty line moved to top level
+		{
+			LineNoChildren: LineNoChildren{},
+		},
 	}
 
 	if !reflect.DeepEqual(organized, expected) {

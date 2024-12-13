@@ -39,7 +39,7 @@ func ParseConfig(content string) *SSHConfig {
 func renderLine(line Line) string {
 	var builder strings.Builder
 
-	// Render the current line
+	// Render the current line's LineNoChildren fields
 	builder.WriteString(line.Indent)
 	builder.WriteString(line.Key)
 	builder.WriteString(line.Sep)
@@ -50,7 +50,10 @@ func renderLine(line Line) string {
 	// Render children if any exist
 	for _, child := range line.Children {
 		builder.WriteString("\n")
-		builder.WriteString(renderLine(child))
+
+		// Create a temporary Line to reuse renderLine
+		childLine := Line{LineNoChildren: child}
+		builder.WriteString(renderLine(childLine))
 	}
 
 	return builder.String()

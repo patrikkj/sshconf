@@ -6,14 +6,18 @@ import (
 	"strings"
 )
 
-type Line struct {
+type LineNoChildren struct {
 	Indent      string // The indentation of the line
 	Key         string // The directive/keyword (e.g., "Host", "HostName", etc.)
 	Sep         string // The separator between the key and the value (e.g., " ", "=")
 	Value       string // The values associated with the directive
 	TrailIndent string // The indentation of the trailing comment
 	Comment     string // Any comment on the line, for lines with only a comment everything except indent and comment is empty
-	Children    []Line // The children of the line (for Host and Match directives)
+}
+
+type Line struct {
+	LineNoChildren
+	Children []LineNoChildren // The children of the line (for Host and Match directives)
 }
 
 // ParseLine parses a single line of an SSH config file into a Line struct
@@ -37,12 +41,14 @@ func ParseLine(line string) Line {
 	}
 
 	return Line{
-		Indent:      matches[1],
-		Key:         matches[2],
-		Sep:         matches[3],
-		Value:       matches[4],
-		TrailIndent: matches[5],
-		Comment:     matches[6],
+		LineNoChildren: LineNoChildren{
+			Indent:      matches[1],
+			Key:         matches[2],
+			Sep:         matches[3],
+			Value:       matches[4],
+			TrailIndent: matches[5],
+			Comment:     matches[6],
+		},
 	}
 }
 
@@ -68,7 +74,7 @@ func OrganizeConfig(lines []Line) []Line {
 		// If line has no key (empty line or comment), add it to current parent or result
 		if line.Key == "" {
 			if currentParent != nil {
-				currentParent.Children = append(currentParent.Children, line)
+				currentParent.Children = append(currentParent.Children, line.LineNoChildren)
 			} else {
 				result = append(result, line)
 			}
@@ -82,14 +88,13 @@ func OrganizeConfig(lines []Line) []Line {
 		} else {
 			// This is a parameter line
 			if currentParent != nil {
-				currentParent.Children = append(currentParent.Children, line)
+				currentParent.Children = append(currentParent.Children, line.LineNoChildren)
 			} else {
 				result = append(result, line)
 			}
 		}
 	}
 
-	// Clean up empty lines
 	return cleanEmptyLines(result)
 }
 
@@ -99,26 +104,22 @@ func cleanEmptyLines(lines []Line) []Line {
 	var result []Line
 
 	for _, line := range lines {
-		// Create a copy of the line to modify
 		newLine := line
 		var trailingEmptyLines []Line
 
 		if len(line.Children) > 0 {
-			// Collect trailing empty lines from end of children
 			for i := len(newLine.Children) - 1; i >= 0; i-- {
 				child := newLine.Children[i]
 				if child.Key == "" && child.Indent == "" {
-					trailingEmptyLines = append(trailingEmptyLines, child)
+					trailingEmptyLines = append(trailingEmptyLines, Line{LineNoChildren: child})
 					newLine.Children = newLine.Children[:i]
 				} else {
 					break
 				}
 			}
 
-			// Add the host/match line
 			result = append(result, newLine)
 
-			// Add collected empty lines in original order
 			for i := len(trailingEmptyLines) - 1; i >= 0; i-- {
 				result = append(result, trailingEmptyLines[i])
 			}
