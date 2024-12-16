@@ -60,14 +60,6 @@ err := config.Write(os.Stdout)
 configStr := config.Render()
 ```
 
-### Raw Parsing Mode
-
-If you need to parse without hierarchical organization (preserving exact file structure):
-
-```go
-config := sshconf.ParseConfigRaw(content)
-```
-
 ## Example
 
 ```go

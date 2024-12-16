@@ -12,20 +12,13 @@ type SSHConfig struct {
 	lines []Line
 }
 
-// ParseConfigRaw parses an SSH config file without organizing the lines hierarchically
-func ParseConfigRaw(content string) *SSHConfig {
-	return &SSHConfig{
-		lines: parseLines(content),
-	}
-}
-
 // ParseConfigFile parses an SSH config file from the given path
 func ParseConfigFile(path string) (*SSHConfig, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return ParseConfigRaw(string(content)), nil
+	return ParseConfig(string(content)), nil
 }
 
 // ParseConfig parses an SSH config file and organizes it hierarchically
